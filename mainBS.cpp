@@ -3,14 +3,14 @@
 
 // Line for compilation:
 
-g++ -std=c++17 mainBS.cpp -lfftw3f -lfftw3 -luhd -lboost_system -lboost_program_options -pthread -otxTextMessage
+//g++ -std=c++17 mainBS.cpp -lfftw3f -lfftw3 -luhd -lboost_system -lboost_program_options -pthread -otxTextMessage
 
 // Headers, remove comments when necessary. 
 
 //#include "headers.hpp"
 //#include "mainHeaders.hpp"
-//#include "Headers.hpp"
-//#include "./PHY_BS.hpp"
+#include "Headers.hpp"
+#include "./PHY_BS.hpp"
 
 
 // Data processing
@@ -71,7 +71,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[])
   //
   // NUL        0x00     00000000      Data packet
 
-  std::string message = "Hello world!"; // init parameter "message" as "Hello world!"
+  std::string message = "Oskarin viesti!"; // init parameter "message" as "Hello world!"
   int message_len = message.length(); // store length of message in parameter for future use
   const char * msg = message.c_str(); // converts the string parameter "message" into an array of characters, "msg"
 
@@ -124,11 +124,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[])
 
         // Print sent data packet, comment out if needed:
       
-        std::cout << "Sent data packet: " << std::endl;
-        for (auto it = txData.begin(); it != txData.end(); it++) {
-          std::cout << *it << " ";
-        }
-        std::cout << std::endl << std::endl;
+        std::cout << "Sent data packet" << std::endl;
     
         auto txItem = std::unique_ptr<TXitem>(new TXitem());       // creates a send item that will hold the tx data
         txItem->insertData(std::move(txData));                     // put data into send item
