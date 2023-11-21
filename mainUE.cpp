@@ -1,9 +1,4 @@
-/*
-  simple tx rx test 
- - pregenerates samples
- - repeats same transmission
- - records samples 
- */
+// Authors: Oskari Mattila, Elias Räisänen, Annina Toimela, Oona Tujula, Serena Karjalainen, Jia Wenying
 
 /** C++
 
@@ -18,10 +13,7 @@ g++ -std=c++17 mainUE.cpp -lfftw3f -lfftw3 -luhd -lboost_system -lboost_program_
 	Headers
 **************************************************************/
 #include "Headers.hpp"
-// #include "mainHeaders.hpp"
-
 #include "./PHY_UE.hpp"
-// #include "../PHY/PHY_UE.hpp"
 
 // Data processing
 #include "./Data_processing.hpp"
@@ -55,13 +47,13 @@ int UHD_SAFE_MAIN(int argc, char *argv[])
 
   std::signal(SIGINT, os_signal_handler);
 
-  InterThreadQueueSDR7320<TXitem> txQueue; 
-  InterThreadQueueSDR7320<RXitem> rxQueue; 
+  InterThreadQueueSDR7320<TXitem> tx_queue; 
+  InterThreadQueueSDR7320<RXitem> rx_queue; 
 
   PHY_UE phyUE;
-  phyUE.makeUEthread(txQueue,rxQueue);
+  phyUE.makeUEthread(tx_queue,rx_queue);
 
-  std::cout<<"UE main loops"<<std::endl;
+  std::cout<<"Starting main loop"<<std::endl;
 
 
   // random data generator
@@ -77,13 +69,13 @@ int UHD_SAFE_MAIN(int argc, char *argv[])
   // Additional code
   //*********************************************************************
 
-  bool No_error = false;
+  bool no_err = false;
   bool data_received = false;
 
   //*********************************************************************
   //*********************************************************************
 
-  int waitForTx=0;
+  int sendWindow=0;
   // while stop condition becomes true
   while(true){
     if(STOP_SIGNAL_CALLED.load()) break;
@@ -93,8 +85,8 @@ int UHD_SAFE_MAIN(int argc, char *argv[])
     //***********************************************************************************
     // tx 
     //***********************************************************************************
-    waitForTx++;
-    if(!(waitForTx%10))
+    sendWindow++;
+    if(!(sendWindow%10))
     {
       /* 
         Example data packet 
@@ -120,74 +112,50 @@ int UHD_SAFE_MAIN(int argc, char *argv[])
       // NUL        0x00     00000000      Data packet
 
 
-      std::vector<int> txData(phy_packet_size);
+      std::vector<int> tx_data(phy_packet_size);
 
       if (data_received) {
 
-        if (No_error) {
-
+        if (no_err) {
           std::vector<int> header = to_int((Byte)0x06);
           for (int i = 0; i < phy_packet_size; i++) {
-            
             if (i < 8) {
-              txData[i] = header[i];
+              tx_data[i] = header[i];
             }
-
             else if ( i < 16) {
-              txData[i] = header[i - 8];
+              tx_data[i] = header[i - 8];
             }
-            
             else {
-              txData[i] = 0;
+              tx_data[i] = 0;
             }
-
           }
-
         }
 
         else {
 
           std::vector<int> header = to_int((Byte)0x15);
           for (int i = 0; i < phy_packet_size; i++) {
-            
             if (i < 8) {
-              txData[i] = header[i];
+              tx_data[i] = header[i];
             }
-
             else if ( i < 16) {
-              txData[i] = header[i - 8];
+              tx_data[i] = header[i - 8];
             }
-            
             else {
-              txData[i] = 0;
+              tx_data[i] = 0;
             }
-
           }
-
         }
 
-
       }
 
-      No_error = false;
+      no_err = false;
       data_received = false;
 
-      /*
-      std::cout << "Sent response: " << std::endl;
-      for (auto it = txData.begin(); it != (txData.begin() + 8); it++) {
-        std::cout << *it << " ";
-      }
-      std::cout << std::endl;
-      for (auto it = (txData.begin() + 8); it != (txData.begin() + 16); it++) {
-        std::cout << *it << " ";
-      }
-      std::cout << std::endl << std::endl;
-      */
-
       auto txItem = std::unique_ptr<TXitem>(new TXitem());       // creates a send item that will hold the tx data
-      txItem->insertData(std::move(txData));                     // put data into send item
+      txItem->insertData(std::move(tx_data));                     // put data into send item
       txItem->tx_meta_data.num_tx_symbols = 6;
-      txQueue.writeItem(std::move(txItem));                      // send the bits vector
+      tx_queue.writeItem(std::move(txItem));                      // send the bits vector
       }
 
     }
@@ -200,33 +168,18 @@ int UHD_SAFE_MAIN(int argc, char *argv[])
     // rx
     //***********************************************************************************
     {
-    auto tmp = std::move(rxQueue.readItem()); // reads the received data from PHY
-		if(tmp != nullptr)                        // received a data packet
+    auto read_rx_queue = std::move(rx_queue.readItem()); // reads the received data from PHY
+		if(read_rx_queue != nullptr)                        // received a data packet
 		{
         
         
       std::vector<int> rx_bin_data;
       for (int i = 0; i < phy_packet_size; i++) {
-        rx_bin_data.push_back((int)(tmp.get()->elem[i]<0));
+        rx_bin_data.push_back((int)(read_rx_queue.get()->elem[i]<0));
       }
 
 
-      /*
-      for (auto it = rx_bin_data.begin(); it != rx_bin_data.end(); it++) {
-        std::cout << *it << " ";
-      }
-      std::cout << std::endl << std::endl;
-      */
-
-      /*
-      if(10*std::log10(std::abs((tmp.get()->rx_meta_data.pilot_power/tmp.get()->rx_meta_data.data_power))) < 3 )
-      {
-        testData->processRxData(&(tmp.get()->elem[0]),&(tmp.get()->rx_meta_data.elem_soft_bits[0]),tmp.get()->elem.size());
-      }
-      */
-
-
-      tmp.reset();
+      read_rx_queue.reset();
       
 
       //****************************************************************************************
@@ -254,21 +207,12 @@ int UHD_SAFE_MAIN(int argc, char *argv[])
         std::vector<Byte> pay_nd_crc_B = to_byte_v(pay_nd_crc);
 
         //CRC check:
-        No_error = checkCRC16(&pay_nd_crc_B[0], (104 + 2)) == 0;
+        no_err = checkCRC16(&pay_nd_crc_B[0], (104 + 2)) == 0;
         
 
-        // Print bin data:
-        /*
-        std::cout << "Packet received! Bin data: " << std::endl;
-        for (auto it = rx_bin_data.begin(); it != rx_bin_data.end(); it++) {
-          std::cout << *it << " ";
-        }
-        std::cout << std::endl << std::endl;
-        */
-
         // Print received message:
-        if (No_error) std::cout << "Packet contained correct message: " << std::endl;
-        else std::cout << "Packet contained CORRUPTED message: (nonprintable = '*' and null = ' ') " << std::endl;
+        if (no_err) std::cout << "Packet contained correct message: " << std::endl;
+        else std::cout << "Packet was corrupted" << std::endl;
         for (auto it = pay_nd_crc_B.begin(); it != (pay_nd_crc_B.end() - 2); it++) {
           if (std::isprint((char)*it)) {
             std::cout << (char)*it;
